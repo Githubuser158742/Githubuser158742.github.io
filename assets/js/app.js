@@ -9,7 +9,7 @@ $(function() {
 
   //JSON inladen van externe locatie en lokaal opslaan
   app.loadJSON = function() {
-    var request = new Request('http://githubuser158742.github.io/assets/data/recipes.json', {
+    var request = new Request('https://githubuser158742.github.io/assets/data/recipes.json', {
       method: 'GET',
       mode: 'cors',
       redirect: 'follow',
