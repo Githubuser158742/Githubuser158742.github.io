@@ -9,8 +9,7 @@ $(function() {
 
   //JSON inladen van externe locatie en lokaal opslaan
   app.loadJSON = function() {
-    var request = new Request('https://githubuser158742.github.io/assets/data/recipes.json', {
-      //var request = new Request('http://localhost:3000/assets/data/recipes2.json', {
+    var request = new Request('http://githubuser158742.github.io/assets/data/recipes.json', {
       method: 'GET',
       mode: 'cors',
       redirect: 'follow',
@@ -39,7 +38,7 @@ $(function() {
         app.reload = 0;
       }
     }).catch(function(error) {
-      //data inladen van lokale storage
+      //data inladen van lokale/indexedDB storage
       app.loadData();
       if (app.reload == 1) {
         alert("Er kon geen data weggeschreven worden!");
@@ -71,19 +70,11 @@ $(function() {
       recipes.push(recipe);
     });
     store.setItem('recipes', JSON.stringify(recipes));
-    //load from LocalForage into the app
     app.loadData();
   };
 
-  //Beoordeling recept
-  // Format:
-  // - recipe_id: Integer
-  // - saved: Boolean
-  // - score: Integer
-  // - comment: String
   app.updateCustomDB = function(jsonData) {
-    //console.log("updateCustomDB");
-    //LocalForage: indexedDB, with fallback LocalStorage
+    //indexedDB heeft voorkeur, indien nodig mogelijk ==> localstorage
     var store = localforage.createInstance({
       name: "recipe_store"
     });
@@ -142,7 +133,7 @@ $(function() {
     }
   };
 
-  // sort by 'id' -
+  // sorteren op 'id'
   app.sortById = function(a, b) {
     var aId = parseInt(a.id);
     var bId = parseInt(b.id);
@@ -152,13 +143,6 @@ $(function() {
         1 :
         0);
   };
-
-  /*
-   * Pagetypes correspond with footer tabs.
-   * Pagetype 1: Show full information + save button
-   * Pagetype 2: Show information + score selector
-   * Pagetype 3: Show rated information
-   */
 
   //recepten tonen op basis van actief tabblad
   app.showRecipes = function(pagetype) {
@@ -182,9 +166,11 @@ $(function() {
     $("#" + id).html("");
     var counter = 1;
 
-    //sorteren indien nodig
+    //default sorteren (indien nodig nog nieuwe sorteermethodes voorzien)
     switch (app.activeTab) {
       case "meat":
+        app.recipes.sort(app.sortById);
+        break;
       case "fish":
         app.recipes.sort(app.sortById);
         break;
@@ -217,10 +203,10 @@ $(function() {
         }
         if ((app.customvalues[recipe.id] !== null) && (app.customvalues[recipe.id] !== undefined)) {
           if (app.customvalues[recipe.id].score !== null) {
-            score = app.customvalues[recipe.id].score;
+            score = escapeHTML(app.customvalues[recipe.id].score);
           }
           if (app.customvalues[recipe.id].comment !== null) {
-            comment = app.customvalues[recipe.id].comment;
+            comment = escapeHTML(app.customvalues[recipe.id].comment);
           }
           if (app.customvalues[recipe.id].saved !== null && pagetype == 2) {
             showSavedElements = true;
@@ -230,18 +216,25 @@ $(function() {
         }
       }
 
+      //escape HTML (XSS filter)
+      var uniqueid = escapeHTML(recipe.id.toString())
+      var description = escapeHTML(recipe.description.toString())
+      var chef = escapeHTML(recipe.chef.toString())
+      var added = escapeHTML(recipe.added.toString())
+      var steps = escapeHTML(recipe.steps.toString())
+
       if (showAllElements) {
         var element = ([
           "<div class='ui-bar ui-bar-b'>",
               "<div class='ui-grid-a'><center>",
-              "<input class='checkboxrecipe' id='checkBox" + recipe.id.toString() + "' data-recipe='" + recipe.id.toString() + "' type='checkbox'>" + recipe.description.toString() + "</center></div>",
+              "<input class='checkboxrecipe' id='checkBox" + uniqueid + "' data-recipe='" + uniqueid + "' type='checkbox'>" + description + "</center></div>",
               "<div class='ui-grid-a'>",
-                "<div class='ui-block-a'><center>" + recipe.chef.toString() + "</center></div>",
-                "<div class='ui-block-b'><center>" + recipe.added.toString() + "</center></div>",
+                "<div class='ui-block-a'><center>" + chef + "</center></div>",
+                "<div class='ui-block-b'><center>" + added + "</center></div>",
               "</div>",
                 "<center><div data-role='collapsible' id='" + id + "' class='ui-collapsible ui-collapsible-inset ui-corner-all ui-collapsible-themed-content'>",
                   "<h4 class='ui-collapsible-heading'>Stappenplan</h4>",
-                      "<p>" + recipe.steps.toString() + "</p>",
+                      "<p>" + steps + "</p>",
               "</center></div>",
           "</div>"
         ].join(" "));
@@ -254,19 +247,19 @@ $(function() {
         var element = ([
           "<div class='ui-bar ui-bar-b'>",
             "<div class='ui-grid-a'>",
-              "<center>" + recipe.description.toString() + "</center>",
+              "<center>" + description + "</center>",
             "</div>",
             "<div class='ui-grid-a'>",
               "<div class='ui-block-a'>",
-                "<center>" + recipe.chef.toString() + "</center>",
+                "<center>" + chef + "</center>",
               "</div>",
               "<div class='ui-block-b'>",
-                "<center>" + recipe.added.toString() + "</center>",
+                "<center>" + added + "</center>",
               "</div>",
             "</div>",
           "<div data-role='collapsible' id='" + id + "' class='ui-collapsible ui-collapsible-inset ui-corner-all ui-collapsible-themed-content'>",
               "<h4 class='ui-collapsible-heading'>Stappenplan</h4>",
-                  "<p>" + recipe.steps.toString() + "</p>",
+                  "<p>" + steps + "</p>",
           "</div>",
           "<div data-role='fieldcontain'>",
           "<div class='ui-grid-a'>",
@@ -319,37 +312,33 @@ $(function() {
         $("#" + id).append(element);
         $("#" + id).trigger("create");
         counter++;
-        //console.log("Added element: " + JSON.stringify(recipe));
-        //console.log("id: " + id);
       }
 
       if (showRatedElements) {
         var element = ([
           "<div class='ui-bar ui-bar-b'>",
           "<div class='ui-grid-a'>",
-            recipe.description.toString(),
+            description,
           "</div>",
           "<div class='ui-grid-a'>",
           "<div class='ui-block-a'>",
-            recipe.chef.toString(),
+            chef,
           "</div>",
           "<div class='ui-block-b'>",
-            recipe.added.toString(),
+            added,
           "</div>",
           "</div>",
           "<div class='ui-grid-a'>",
           "<div class='ui-block-a'>",
-          //"Score: " + escapeHTML(score.toString()),
           "Score: " + score.toString(),
           "</div>",
           "<div class='ui-block-b'>",
-          //"Commentaar: " + escapeHTML(comment.toString()),
           "Commentaar: " + comment.toString(),
           "</div>",
           "</div>",
           "<div data-role='collapsible' id='" + id + "' class='ui-collapsible ui-collapsible-inset ui-corner-all ui-collapsible-themed-content'>",
               "<h4 class='ui-collapsible-heading'>Stappenplan</h4>",
-                  "<p>" + recipe.steps.toString() + "</p>",
+                  "<p>" + steps + "</p>",
           "</div>",
           "</div>"
         ].join(" "));
@@ -359,7 +348,7 @@ $(function() {
     });
   };
 
-  //eerste pagina
+  //eerste pagina ==> code wordt niet altijd bereikt wnr knop wordt aangeklikt
   $("#btnOne").on('click buildpage', function(event) {
     app.activeTab = "meat";
     $("#pageMeat").addClass("ui-btn-active");
@@ -385,7 +374,6 @@ $(function() {
   });
 
   // 'checkBox" + recipe.id.toString()
-  //on changing score => save data
   $(document).on("change", function(event) {
     var checked = $('#' + event.target.id + ':checkbox:checked').length > 0;
     var recipeid = parseInt($('#' + event.target.id).data("recipe"));
@@ -406,7 +394,6 @@ $(function() {
     }
   });
 
-  //on changing score => save data
   $(document).on("change", function(event) {
     var value = $('#' + event.target.id + ' option:selected').val();
     //var checked = true;
@@ -451,7 +438,7 @@ $(function() {
     }
   });
 
-  //tweede pagina
+  //tweede pagina ==> code wordt niet altijd bereikt wnr knop wordt aangeklikt
   $("#btnTwo").on('click buildpage', function(event) {
     app.page = "saved";
     app.activeTab = "meat";
@@ -480,8 +467,7 @@ $(function() {
     app.showRecipes(2);
   });
 
-
-  //Derde pagina
+  //Derde pagina ==> code wordt niet altijd bereikt wnr knop wordt aangeklikt
   $("#btnThree").on('click buildpage', function(event) {
     app.page = "rated";
     app.activeTab = "meat";
@@ -491,11 +477,6 @@ $(function() {
     //wanneer trigger hier wordt opgeroepen ==> geen resultaat
     //$("pageMeatRated").trigger("click");
   });
-
-  //testingpurpose
-  // $("#btnThree").on('click', function(event){
-  //   console.log("er is geklikt op btn 3");
-  // });
 
   //tab: meat
   $("#pageMeatRated").on('click', function(event) {
@@ -528,15 +509,10 @@ $(function() {
       location.reload();
   });
 
-  /*****************************************************************************
-   *
-   * Service Worker: offline use
-   *
-   ****************************************************************************/
-  // TODO: Files toevoegen aan sw.js om te cachen.
+
+  //serviceworker registreren voor caching
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(function() {
-      //console.log("service worker registered");
     });
   }
 
@@ -558,11 +534,6 @@ $(function() {
     });
   }
 
-  /*****************************************************************************
-   *
-   * Startup
-   *
-   ****************************************************************************/
-  //console.log("startup");
+  //let the games begin
   app.loadJSON();
 });
